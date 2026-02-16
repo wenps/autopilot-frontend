@@ -1,0 +1,166 @@
+/**
+ * Tool Registry — 工具注册表，负责工具的注册、查询和分发。
+ *
+ * 这是 Agent 工具系统的核心枢纽，采用 Registry 模式（注册表模式）：
+ *
+ *   ┌──────────────┐     registerTool()     ┌───────────────────┐
+ *   │  exec-tool   │ ────────────────────►  │                   │
+ *   │  browser-tool│ ────────────────────►  │   Tool Registry   │
+ *   │  file-tools  │ ────────────────────►  │   (Map 存储)       │
+ *   │  web-search  │ ────────────────────►  │                   │
+ *   │  web-fetch   │ ────────────────────►  │                   │
+ *   └──────────────┘                        └─────────┬─────────┘
+ *                                                     │
+ *                               ┌─────────────────────┼──────────────────┐
+ *                               │                     │                  │
+ *                               ▼                     ▼                  ▼
+ *                     getToolDefinitions()    dispatchToolCall()    helper 函数
+ *                     (给 AI 看工具列表)      (按名字执行工具)    (参数读取辅助)
+ *
+ * 为什么用 Registry 模式？
+ * - 解耦：agent-core 不需要知道具体有哪些工具，只通过注册表查询和调用
+ * - 可扩展：新增工具只需创建文件 + 调用 registerTool()，不用改核心代码
+ * - 统一接口：所有工具都遵循 ToolDefinition 接口，AI 和调度器都能统一处理
+ */
+import { Type, type TObject } from "@sinclair/typebox";
+
+/**
+ * 工具执行结果 — 每个工具的 execute() 必须返回此类型。
+ */
+export type ToolCallResult = {
+  /** 返回内容（字符串文本或结构化对象，最终会序列化后发给 AI） */
+  content: string | Record<string, unknown>;
+  /** 可选的额外细节（用于日志记录、调试等，不直接发给 AI） */
+  details?: Record<string, unknown>;
+};
+
+/**
+ * 工具定义 — 注册工具时需要提供的完整描述。
+ *
+ * 这四个字段分别告诉 AI「叫什么名字」「能做什么」「需要什么参数」「怎么执行」：
+ * - name + description → AI 根据用户意图选择合适的工具
+ * - schema → AI 生成符合格式的参数 JSON
+ * - execute → 实际执行逻辑
+ */
+export type ToolDefinition = {
+  /** 工具名称（AI 通过此名称调用，如 "exec"、"file_read"） */
+  name: string;
+  /** 工具描述（AI 据此判断何时使用这个工具） */
+  description: string;
+  /** 参数的 JSON Schema（TypeBox 定义，描述工具接受哪些参数及其类型） */
+  schema: TObject;
+  /** 执行函数 — 接收 AI 传入的参数，返回执行结果 */
+  execute: (params: Record<string, unknown>) => Promise<ToolCallResult>;
+};
+
+/**
+ * 工具存储 — 用 Map 以工具名为 key 存储所有已注册的工具。
+ * 模块级变量，整个进程共享一份注册表。
+ */
+const tools = new Map<string, ToolDefinition>();
+
+/**
+ * 注册一个工具到注册表。
+ * 调用方：src/agent/tools/index.ts 中的 registerBuiltinTools()
+ */
+export function registerTool(tool: ToolDefinition): void {
+  tools.set(tool.name, tool);
+}
+
+/**
+ * 获取所有已注册的工具定义列表。
+ * 调用方：agent-core.ts — 将列表发送给 AI 模型，告知可用工具。
+ */
+export function getToolDefinitions(): ToolDefinition[] {
+  return Array.from(tools.values());
+}
+
+/**
+ * 根据工具名分发并执行工具调用。
+ *
+ * 调用方：agent-core.ts 中循环处理 AI 返回的 tool_call 时调用。
+ * - 找到工具 → 执行 execute() → 返回结果
+ * - 找不到 → 返回错误信息（不会抛异常，让 AI 知道工具不存在）
+ * - 执行出错 → 捕获异常，返回错误信息（不中断 Agent 循环）
+ */
+export async function dispatchToolCall(
+  name: string,
+  input: unknown,
+): Promise<ToolCallResult> {
+  const tool = tools.get(name);
+  if (!tool) {
+    // 工具不存在 — 返回错误让 AI 知道，而不是抛异常崩溃
+    return {
+      content: `Unknown tool: ${name}`,
+      details: { error: true, toolName: name },
+    };
+  }
+
+  try {
+    const params = (input ?? {}) as Record<string, unknown>;
+    return await tool.execute(params);
+  } catch (err) {
+    // 工具执行异常 — 捕获后优雅返回，Agent 可以继续运行
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      content: `Tool "${name}" failed: ${message}`,
+      details: { error: true, toolName: name, message },
+    };
+  }
+}
+
+// ─── 参数读取辅助函数 ───
+// 各工具的 execute() 收到的 params 是 Record<string, unknown>（无类型），
+// 这些 helper 提供类型安全的参数提取。
+
+/**
+ * 从参数对象中读取字符串类型的参数。
+ * @param params  - AI 传入的参数对象
+ * @param key     - 参数名
+ * @param options - required: 是否必填（缺失则抛错）；trim: 是否去除首尾空白
+ */
+export function readStringParam(
+  params: Record<string, unknown>,
+  key: string,
+  options: { required?: boolean; trim?: boolean } = {},
+): string | undefined {
+  const { required = false, trim = true } = options;
+  const raw = params[key];
+  if (typeof raw !== "string") {
+    if (required) throw new Error(`Parameter "${key}" is required`);
+    return undefined;
+  }
+  const value = trim ? raw.trim() : raw;
+  if (!value && required) throw new Error(`Parameter "${key}" is required`);
+  return value || undefined;
+}
+
+/**
+ * 从参数对象中读取数字类型的参数。
+ * 支持 AI 传入数字或数字型字符串（如 "5"），自动转换。
+ */
+export function readNumberParam(
+  params: Record<string, unknown>,
+  key: string,
+  options: { required?: boolean } = {},
+): number | undefined {
+  const raw = params[key];
+  if (raw === undefined || raw === null) {
+    if (options.required) throw new Error(`Parameter "${key}" is required`);
+    return undefined;
+  }
+  const num = typeof raw === "number" ? raw : Number(raw);
+  if (Number.isNaN(num)) throw new Error(`Parameter "${key}" must be a number`);
+  return num;
+}
+
+/**
+ * 将任意数据包装为 JSON 格式的工具返回结果。
+ * 便捷方法，同时提供序列化文本（给 AI 看）和原始对象（给 details 日志用）。
+ */
+export function jsonResult(payload: unknown): ToolCallResult {
+  return {
+    content: JSON.stringify(payload, null, 2),
+    details: payload as Record<string, unknown>,
+  };
+}
