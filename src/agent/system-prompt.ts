@@ -1,100 +1,44 @@
 /**
- * System prompt builder.
- * Pattern from OpenClaw's src/agents/system-prompt.ts
+ * 极简系统提示词 — 告诉 AI 它是谁以及有哪些工具可用。
  *
- * Builds the system prompt with available tools, skills, workspace context,
- * and runtime information.
+ * 【后续可拓展】
+ * - 添加 Skills 系统（从 ~/.autopilot/skills/ 加载 Markdown 技能文件）
+ * - 添加 Runtime 信息段（provider、model、date 等）
+ * - 支持 extraInstructions 注入自定义指令
+ * - 支持 thinkingLevel 控制思考深度
  */
 import type { AutoPilotConfig } from "../config/config.js";
 import { getToolDefinitions } from "./tool-registry.js";
-import { loadSkillsPrompt } from "./skills.js";
 
 export type SystemPromptParams = {
   config: AutoPilotConfig;
   thinkingLevel?: string;
-  extraInstructions?: string;
 };
 
+/**
+ * 构建系统提示词。
+ * 由两部分组成：身份描述 + 可用工具列表。
+ */
 export function buildSystemPrompt(params: SystemPromptParams): string {
   const sections: string[] = [];
 
-  // Identity
-  sections.push(buildIdentitySection());
+  // 身份
+  sections.push(
+    "You are AutoPilot, a personal AI automation agent.\n" +
+    "You can execute shell commands, read/write files, search the web, and fetch web pages.\n" +
+    "Always confirm destructive actions with the user before executing."
+  );
 
-  // Tooling
-  sections.push(buildToolingSection());
-
-  // Skills
-  const skillsPrompt = loadSkillsPrompt();
-  if (skillsPrompt) {
-    sections.push(buildSkillsSection(skillsPrompt));
-  }
-
-  // Runtime info
-  sections.push(buildRuntimeSection(params));
-
-  // Extra instructions
-  if (params.extraInstructions?.trim()) {
-    sections.push(params.extraInstructions.trim());
-  }
-
-  return sections.filter(Boolean).join("\n\n");
-}
-
-function buildIdentitySection(): string {
-  return [
-    "You are AutoPilot, a personal AI automation agent.",
-    "You can control a browser (navigate, fill forms, click, screenshot),",
-    "open VSCode and fix code, search the web, and execute shell commands.",
-    "Always confirm destructive actions with the user before executing.",
-  ].join("\n");
-}
-
-function buildToolingSection(): string {
+  // 工具列表
   const tools = getToolDefinitions();
-  if (tools.length === 0) return "";
-
-  const lines = [
-    "## Available Tools",
-    "",
-    "You have access to the following tools:",
-    "",
-  ];
-
-  for (const tool of tools) {
-    lines.push(`- **${tool.name}**: ${tool.description}`);
+  if (tools.length > 0) {
+    const toolLines = tools.map(t => `- **${t.name}**: ${t.description}`);
+    sections.push(
+      "## Available Tools\n\n" +
+      toolLines.join("\n") + "\n\n" +
+      "Use tools when needed to complete the user's request."
+    );
   }
 
-  lines.push("");
-  lines.push("Use tools when needed to complete the user's request. Prefer combining multiple tool calls efficiently.");
-
-  return lines.join("\n");
-}
-
-function buildSkillsSection(skillsPrompt: string): string {
-  return [
-    "## Skills (mandatory)",
-    "Before replying: scan <available_skills> <description> entries.",
-    "- If exactly one skill clearly applies: read its SKILL.md, then follow it.",
-    "- If multiple could apply: choose the most specific one.",
-    "- If none clearly apply: do not read any SKILL.md.",
-    "",
-    skillsPrompt,
-  ].join("\n");
-}
-
-function buildRuntimeSection(params: SystemPromptParams): string {
-  const lines = [
-    "## Runtime",
-    `- Thinking level: ${params.thinkingLevel ?? "medium"}`,
-    `- Provider: ${params.config.agent?.provider ?? "anthropic"}`,
-    `- Model: ${params.config.agent?.model ?? "default"}`,
-    `- Date: ${new Date().toISOString().split("T")[0]}`,
-  ];
-
-  if (params.config.browser?.enabled !== false) {
-    lines.push("- Browser: enabled (Playwright)");
-  }
-
-  return lines.join("\n");
+  return sections.join("\n\n");
 }

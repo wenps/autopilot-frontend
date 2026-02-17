@@ -123,7 +123,7 @@ function createAnthropicClient(params: AIClientConfig): AIClient {
         model: params.model,
         max_tokens: params.model.includes("opus") ? 16384 : 8192,
         system: systemPrompt,
-        messages: anthropicMessages,
+        messages: anthropicMessages as any,
         tools: anthropicTools as any,
       });
 
