@@ -6,11 +6,11 @@
  *   2. 在这里 import 并 registerTool()
  *
  * 【后续可拓展】
- * - 添加 browser-tool（Playwright 浏览器自动化）
  * - 添加自定义工具加载器（从插件目录动态加载）
  */
 import { registerTool } from "../tool-registry.js";
 import { createExecTool } from "./exec-tool.js";
+import { createBrowserTool } from "./browser-tool.js";
 import { createWebFetchTool } from "./web-fetch-tool.js";
 import { createWebSearchTool } from "./web-search-tool.js";
 import { createFileReadTool, createFileWriteTool, createListDirTool } from "./file-tools.js";
@@ -22,6 +22,7 @@ export function registerBuiltinTools(): void {
   registered = true;
 
   registerTool(createExecTool());       // Shell 命令执行
+  registerTool(createBrowserTool());    // 浏览器自动化（Playwright）
   registerTool(createWebFetchTool());   // 网页内容抓取
   registerTool(createWebSearchTool());  // 网页搜索
   registerTool(createFileReadTool());   // 文件读取

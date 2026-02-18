@@ -11,12 +11,23 @@
 
 export interface AutoPilotConfig {
   agent?: {
-    /** AI provider: "anthropic" | "openai" */
+    /** AI provider: "anthropic" | "openai" | "copilot" */
     provider?: string;
-    /** Model ID, e.g. "claude-opus-4-6" */
+    /** Model ID, e.g. "claude-opus-4-6", "gpt-4o" */
     model?: string;
     /** API key override (prefer env var) */
     apiKey?: string;
+    /**
+     * 自定义 API 基础 URL（用于 GitHub Copilot、Azure OpenAI 等兼容端点）。
+     * Copilot 默认: https://api.githubcopilot.com
+     */
+    baseURL?: string;
+  };
+  browser?: {
+    /** 是否无头模式运行（默认 false，可看到浏览器窗口） */
+    headless?: boolean;
+    /** 自定义 Chromium 可执行文件路径 */
+    executablePath?: string;
   };
 }
 

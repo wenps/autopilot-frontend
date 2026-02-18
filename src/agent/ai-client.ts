@@ -39,8 +39,12 @@ export type AIClientConfig = {
 
 /**
  * AI 客户端工厂函数 —— 项目连接 AI 的入口。
- * 根据配置中的 provider 字段（"anthropic" 或 "openai"）创建对应的 AI 客户端实例。
- * 调用方通过返回的 AIClient.chat() 方法与大模型交互。
+ * 根据配置中的 provider 字段创建对应的 AI 客户端实例。
+ *
+ * 支持三种 provider：
+ * - "anthropic" → Anthropic Claude API
+ * - "openai"    → OpenAI GPT API
+ * - "copilot"   → GitHub Copilot（OpenAI 兼容，使用 GitHub Token 认证）
  */
 export function createAIClient(params: AIClientConfig): AIClient {
   const { provider } = params;
@@ -50,8 +54,10 @@ export function createAIClient(params: AIClientConfig): AIClient {
       return createAnthropicClient(params);
     case "openai":
       return createOpenAIClient(params);
+    case "copilot":
+      return createCopilotClient(params);
     default:
-      throw new Error(`Unknown AI provider: ${provider}. Supported: anthropic, openai`);
+      throw new Error(`Unknown AI provider: ${provider}. Supported: anthropic, openai, copilot`);
   }
 }
 
@@ -171,8 +177,11 @@ function createOpenAIClient(params: AIClientConfig): AIClient {
       const apiKey = params.config.agent?.apiKey ?? process.env.OPENAI_API_KEY;
       if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
-      // 使用 API Key 实例化 OpenAI 客户端
-      const client = new OpenAI({ apiKey });
+      // 使用 API Key 实例化 OpenAI 客户端（支持自定义 baseURL）
+      const client = new OpenAI({
+        apiKey,
+        ...(params.config.agent?.baseURL ? { baseURL: params.config.agent.baseURL } : {}),
+      });
 
       // 将统一的 ToolDefinition 转换为 OpenAI function calling 格式
       const openaiTools = tools?.map((t) => ({
@@ -244,4 +253,46 @@ function createOpenAIClient(params: AIClientConfig): AIClient {
       };
     },
   };
+}
+
+// ─── GitHub Copilot Client ───
+
+/**
+ * 创建 GitHub Copilot 客户端。
+ *
+ * 使用 GitHub Models API（OpenAI 兼容端点），支持 Personal Access Token 认证。
+ * - API 端点：https://models.inference.ai.azure.com
+ * - 认证方式：使用 GitHub Personal Access Token
+ * - 可用模型：gpt-4o、gpt-4o-mini、o3-mini、claude-sonnet-4-20250514 等
+ *
+ * 使用方法：
+ *   export GITHUB_TOKEN="github_pat_xxxx..."
+ */
+function createCopilotClient(params: AIClientConfig): AIClient {
+  // GitHub Models API 端点（支持 PAT 认证）
+  const copilotBaseURL = params.config.agent?.baseURL ?? "https://models.inference.ai.azure.com";
+  const copilotApiKey = params.config.agent?.apiKey ?? process.env.GITHUB_TOKEN;
+
+  if (!copilotApiKey) {
+    throw new Error(
+      "Missing GITHUB_TOKEN for Copilot provider.\n" +
+      "Set it via: export GITHUB_TOKEN=\"ghp_xxxx...\"\n" +
+      "Or run: gh auth token"
+    );
+  }
+
+  // 构造一个伪造的 config，让 OpenAI client 使用 Copilot 的 endpoint 和 token
+  const copilotConfig: AIClientConfig = {
+    ...params,
+    config: {
+      ...params.config,
+      agent: {
+        ...params.config.agent,
+        apiKey: copilotApiKey,
+        baseURL: copilotBaseURL,
+      },
+    },
+  };
+
+  return createOpenAIClient(copilotConfig);
 }

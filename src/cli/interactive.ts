@@ -19,8 +19,12 @@ import { loadConfig } from "../config/config.js";
 export async function runInteractiveChat(): Promise<void> {
   const config = loadConfig();
 
+  // dry-run 开关：输入 /dry 切换
+  let dryRun = false;
+
   console.log("\n\ud83e\udd16 AutoPilot Interactive Mode");
-  console.log("Type a message to chat. Type 'exit' or Ctrl+C to quit.\n");
+  console.log("Type a message to chat. Type 'exit' or Ctrl+C to quit.");
+  console.log("Commands: /dry (toggle dry-run mode)\n");
 
   const rl = readline.createInterface({ input: stdin, output: stdout });
 
@@ -31,12 +35,20 @@ export async function runInteractiveChat(): Promise<void> {
       if (!message) continue;
       if (message === "exit" || message === "quit") break;
 
+      // 内置命令：切换 dry-run 模式
+      if (message === "/dry") {
+        dryRun = !dryRun;
+        console.log(`\n\ud83d\udd27 Dry-run mode: ${dryRun ? "ON\uff08\u5de5\u5177\u53ea\u6253\u5370\u4e0d\u6267\u884c\uff09" : "OFF\uff08\u6b63\u5e38\u6267\u884c\uff09"}\n`);
+        continue;
+      }
+
       try {
         const result = await runAgent({
           message,
-          provider: config.agent?.provider ?? "anthropic",
+          provider: config.agent?.provider ?? "copilot",
           model: config.agent?.model,
           config,
+          dryRun,
         });
 
         console.log(`\nautopilot > ${result.reply}\n`);

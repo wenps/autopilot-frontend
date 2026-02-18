@@ -20,9 +20,9 @@ import { registerBuiltinTools } from "./tools/index.js";
 // ─── 默认值 ───
 
 /** 默认 AI 提供商 */
-export const DEFAULT_PROVIDER = "anthropic";
-/** 默认模型 */
-export const DEFAULT_MODEL = "claude-opus-4-6";
+export const DEFAULT_PROVIDER = "copilot";
+/** 默认模型（GitHub Models 可用：gpt-4o, gpt-4o-mini, o3-mini） */
+export const DEFAULT_MODEL = "gpt-4o";
 /** 默认上下文窗口大小（token 数） */
 export const DEFAULT_CONTEXT_TOKENS = 200_000;
 
@@ -36,10 +36,12 @@ export type AgentRunParams = {
   thinkingLevel?: string;
   /** 模型 ID 覆盖，如 "claude-sonnet-4-20250514" */
   model?: string;
-  /** AI 提供商: "anthropic" | "openai" */
+  /** AI 提供商: "anthropic" | "openai" | "copilot" */
   provider: string;
   /** 完整配置对象 */
   config: AutoPilotConfig;
+  /** 干运行模式：AI 请求调用工具时只打印配置，不实际执行 */
+  dryRun?: boolean;
 };
 
 /**
@@ -104,6 +106,25 @@ export async function runAgent(params: AgentRunParams): Promise<AgentRunResult> 
     // 4b. 如果 AI 没有请求调用任何工具 → 循环结束，拿到最终回复
     if (!response.toolCalls || response.toolCalls.length === 0) {
       finalReply = response.text ?? "";
+      break;
+    }
+
+    // 4b-dry. 干运行模式：只打印工具调用配置，不实际执行
+    if (params.dryRun) {
+      if (response.text) {
+        finalReply = response.text + "\n\n";
+      }
+      finalReply += "🔧 AI 请求调用以下工具（dry-run 模式，未执行）：\n";
+      for (const tc of response.toolCalls) {
+        finalReply += `\n┌─ 工具: ${tc.name}\n`;
+        finalReply += `│  ID:   ${tc.id}\n`;
+        finalReply += `│  参数:\n`;
+        const inputStr = JSON.stringify(tc.input, null, 2);
+        for (const line of inputStr.split("\n")) {
+          finalReply += `│    ${line}\n`;
+        }
+        finalReply += `└────────────────────\n`;
+      }
       break;
     }
 
