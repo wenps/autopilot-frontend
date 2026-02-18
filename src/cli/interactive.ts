@@ -13,7 +13,7 @@
  */
 import * as readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import { runAgent } from "../agent/agent-core.js";
+import { runAgent } from "../core/agent-core.js";
 import { loadConfig } from "../config/config.js";
 
 export async function runInteractiveChat(): Promise<void> {

@@ -15,7 +15,7 @@
 import { Type } from "@sinclair/typebox";
 import fs from "node:fs";
 import path from "node:path";
-import type { ToolDefinition, ToolCallResult } from "../tool-registry.js";
+import type { ToolDefinition, ToolCallResult } from "../../core/tool-registry.js";
 
 /** 文件读取最大字符数 */
 const MAX_READ_CHARS = 50_000;

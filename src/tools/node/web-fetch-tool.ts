@@ -14,7 +14,7 @@
  * - 自定义 User-Agent 标识 AutoPilot
  */
 import { Type } from "@sinclair/typebox";
-import type { ToolDefinition, ToolCallResult } from "../tool-registry.js";
+import type { ToolDefinition, ToolCallResult } from "../../core/tool-registry.js";
 
 /** 返回内容最大字符数 */
 const MAX_CONTENT_CHARS = 40_000;

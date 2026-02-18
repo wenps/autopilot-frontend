@@ -13,7 +13,7 @@
  *   → runCommandWithTimeout() 执行 → 清理输出 → 返回 stdout/stderr + 退出码
  */
 import { Type } from "@sinclair/typebox";
-import type { ToolDefinition, ToolCallResult } from "../tool-registry.js";
+import type { ToolDefinition, ToolCallResult } from "../../core/tool-registry.js";
 import { getShellConfig, sanitizeBinaryOutput } from "../../process/shell.js";
 import { runCommandWithTimeout, type SpawnResult } from "../../process/exec.js";
 

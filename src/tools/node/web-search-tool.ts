@@ -8,7 +8,7 @@
  *   AI 传入 query → 调用 Brave Search REST API → 返回标题 + URL + 摘要列表
  */
 import { Type } from "@sinclair/typebox";
-import type { ToolDefinition, ToolCallResult } from "../tool-registry.js";
+import type { ToolDefinition, ToolCallResult } from "../../core/tool-registry.js";
 
 /** Brave Search API 返回的单条搜索结果结构 */
 type BraveSearchResult = {

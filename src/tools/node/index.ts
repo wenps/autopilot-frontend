@@ -8,7 +8,7 @@
  * 【后续可拓展】
  * - 添加自定义工具加载器（从插件目录动态加载）
  */
-import { registerTool } from "../tool-registry.js";
+import { registerTool } from "../../core/tool-registry.js";
 import { createExecTool } from "./exec-tool.js";
 import { createBrowserTool } from "./browser-tool.js";
 import { createWebFetchTool } from "./web-fetch-tool.js";

@@ -15,7 +15,7 @@ import type { AutoPilotConfig } from "../config/config.js";
 import { buildSystemPrompt } from "./system-prompt.js";
 import { getToolDefinitions, dispatchToolCall, type ToolCallResult } from "./tool-registry.js";
 import { createAIClient, type AIMessage, type AIToolCall } from "./ai-client.js";
-import { registerBuiltinTools } from "./tools/index.js";
+import { registerBuiltinTools } from "../tools/node/index.js";
 
 // ─── 默认值 ───
 

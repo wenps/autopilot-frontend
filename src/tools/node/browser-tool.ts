@@ -17,7 +17,7 @@
  * - 错误隔离：所有动作包在 try/catch 中，出错返回错误文本而非抛异常
  */
 import { Type } from "@sinclair/typebox";
-import type { ToolDefinition, ToolCallResult } from "../tool-registry.js";
+import type { ToolDefinition, ToolCallResult } from "../../core/tool-registry.js";
 import { BrowserController } from "../../browser/controller.js";
 import { loadConfig } from "../../config/config.js";
 
